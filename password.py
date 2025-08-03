@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 SecretSauce - Advanced Password Generator and Validator
-Features comprehensive password analysis and generation
+Features comprehensive password analysis using zxcvbn and secure generation
 """
 
 import sys
@@ -11,12 +11,6 @@ import os
 
 def check_and_install_requirements():
     """Check for required packages and install them if missing"""
-    required_packages = {
-        'gi': 'PyGObject',
-    }
-    
-    missing_packages = []
-    
     # Check GTK3 availability
     try:
         import gi
@@ -31,18 +25,90 @@ def check_and_install_requirements():
         print("Arch: sudo pacman -S python-gobject gtk3")
         sys.exit(1)
     
-    # Check other required modules (most are built-in)
+    # Check zxcvbn
     try:
-        import random, string, math, re, zlib
-        from collections import Counter, defaultdict
-        from itertools import groupby
-        from pathlib import Path
-        import webbrowser
-    except ImportError as e:
-        print(f"Missing required module: {e}")
-        sys.exit(1)
+        import zxcvbn
+        print("All requirements satisfied!")
+        return
+    except ImportError:
+        pass
     
-    print("All requirements satisfied!")
+    print("zxcvbn not found. Attempting to install...")
+    
+    # Try different installation methods in order of preference
+    install_methods = [
+        # Method 1: Try system package manager (most reliable)
+        {
+            'name': 'system package manager',
+            'commands': [
+                ['apt', 'install', '-y', 'python3-zxcvbn'],  # Debian/Ubuntu
+                ['dnf', 'install', '-y', 'python3-zxcvbn'],  # Fedora
+                ['pacman', '-S', '--noconfirm', 'python-zxcvbn'],  # Arch
+            ]
+        },
+        # Method 2: Try pipx (recommended for applications)
+        {
+            'name': 'pipx',
+            'commands': [
+                ['pipx', 'install', 'zxcvbn']
+            ]
+        },
+        # Method 3: Try pip with user flag
+        {
+            'name': 'pip --user',
+            'commands': [
+                [sys.executable, '-m', 'pip', 'install', '--user', 'zxcvbn']
+            ]
+        }
+    ]
+    
+    for method in install_methods:
+        for cmd in method['commands']:
+            try:
+                print(f"Trying {method['name']}: {' '.join(cmd)}")
+                subprocess.check_call(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                
+                # Test if installation worked
+                try:
+                    import zxcvbn
+                    print(f"zxcvbn installed successfully via {method['name']}!")
+                    return
+                except ImportError:
+                    continue
+                    
+            except (subprocess.CalledProcessError, FileNotFoundError):
+                continue
+    
+    # If all methods failed, provide clear instructions
+    print("\n" + "="*60)
+    print("❌ INSTALLATION FAILED")
+    print("="*60)
+    print("SecretSauce requires the 'zxcvbn' package, but automatic installation failed.")
+    print("Please install it manually using ONE of these methods:")
+    print()
+    print("🔸 METHOD 1 - System Package Manager (Recommended):")
+    print("   Ubuntu/Debian: sudo apt install python3-zxcvbn")
+    print("   Fedora:        sudo dnf install python3-zxcvbn") 
+    print("   Arch:          sudo pacman -S python-zxcvbn")
+    print()
+    print("🔸 METHOD 2 - Virtual Environment:")
+    print("   python3 -m venv secretsauce-env")
+    print("   source secretsauce-env/bin/activate")
+    print("   pip install zxcvbn")
+    print("   python password.py")
+    print()
+    print("🔸 METHOD 3 - pipx (if available):")
+    print("   pipx install zxcvbn")
+    print()
+    print("🔸 METHOD 4 - User install:")
+    print("   python3 -m pip install --user zxcvbn")
+    print()
+    print("🔸 METHOD 5 - Override system protection (NOT recommended):")
+    print("   python3 -m pip install --break-system-packages zxcvbn")
+    print()
+    print("After installation, run: python3 password.py")
+    print("="*60)
+    sys.exit(1)
 
 # Check requirements before proceeding
 check_and_install_requirements()
@@ -51,15 +117,13 @@ import gi
 gi.require_version('Gtk', '3.0')
 gi.require_version('Pango', '1.0')
 from gi.repository import Gtk, Pango, Gdk, GLib
-import random
+import secrets
 import string
 import math
-import re
-from collections import Counter, defaultdict
-from itertools import groupby
-import zlib
+import time
 from pathlib import Path
 import webbrowser
+from zxcvbn import zxcvbn
 
 class AboutDialog(Gtk.Dialog):
     """About dialog for SecretSauce"""
@@ -94,8 +158,8 @@ class AboutDialog(Gtk.Dialog):
         desc_label.set_markup(
             "<span size='medium'>Advanced Password Generator &amp; Security Validator</span>\n\n"
             "Generate ultra-secure passwords with comprehensive security analysis.\n"
-            "Features 16+ validation methods including entropy analysis,\n"
-            "pattern detection, and cryptographic strength evaluation."
+            "Powered by zxcvbn for professional-grade password strength evaluation\n"
+            "and cryptographically secure generation using Python's secrets module."
         )
         desc_label.set_line_wrap(True)
         desc_label.set_justify(Gtk.Justification.CENTER)
@@ -112,14 +176,14 @@ class AboutDialog(Gtk.Dialog):
         grid.set_halign(Gtk.Align.CENTER)
         
         # Version
-        self._add_grid_row(grid, 0, "Version:", "1.0")
+        self._add_grid_row(grid, 0, "Version:", "2.0")
         
         # Author
         self._add_grid_row(grid, 1, "Author:", "Andrej Fuera - Created with Claude")
         
         # Features
         features_label = Gtk.Label()
-        features_label.set_markup("<small>16+ Security Analysis Methods\nUp to 4096 Character Passwords\nReal-time Validation</small>")
+        features_label.set_markup("<small>zxcvbn Password Analysis\nCryptographically Secure Generation\nCrack Time Estimation</small>")
         features_label.set_justify(Gtk.Justification.LEFT)
         self._add_grid_custom_widget(grid, 2, "Features:", features_label)
         
@@ -170,388 +234,8 @@ class AboutDialog(Gtk.Dialog):
         return True
 
 
-class PasswordAnalyzer:
-    """Comprehensive password analysis engine"""
-    
-    def __init__(self):
-        # Keyboard layout for adjacency analysis
-        self.keyboard_layout = {
-            'q': ['w', 'a'], 'w': ['q', 'e', 's', 'a'], 'e': ['w', 'r', 'd', 's'],
-            'r': ['e', 't', 'f', 'd'], 't': ['r', 'y', 'g', 'f'], 'y': ['t', 'u', 'h', 'g'],
-            'u': ['y', 'i', 'j', 'h'], 'i': ['u', 'o', 'k', 'j'], 'o': ['i', 'p', 'l', 'k'],
-            'p': ['o', 'l'], 'a': ['q', 'w', 's', 'z'], 's': ['a', 'w', 'e', 'd', 'z', 'x'],
-            'd': ['s', 'e', 'r', 'f', 'x', 'c'], 'f': ['d', 'r', 't', 'g', 'c', 'v'],
-            'g': ['f', 't', 'y', 'h', 'v', 'b'], 'h': ['g', 'y', 'u', 'j', 'b', 'n'],
-            'j': ['h', 'u', 'i', 'k', 'n', 'm'], 'k': ['j', 'i', 'o', 'l', 'm'],
-            'l': ['k', 'o', 'p'], 'z': ['a', 's', 'x'], 'x': ['z', 's', 'd', 'c'],
-            'c': ['x', 'd', 'f', 'v'], 'v': ['c', 'f', 'g', 'b'], 'b': ['v', 'g', 'h', 'n'],
-            'n': ['b', 'h', 'j', 'm'], 'm': ['n', 'j', 'k']
-        }
-        
-        # Visual similarity groups
-        self.similar_chars = [
-            ['0', 'O', 'o'], ['1', 'l', 'I', '|'], ['2', 'Z'], ['5', 'S'],
-            ['6', 'G'], ['8', 'B'], ['9', 'g'], ['rn', 'm'], ['vv', 'w']
-        ]
-    
-    def analyze_password(self, password):
-        """Perform comprehensive password analysis"""
-        results = {}
-        
-        # Basic metrics
-        results['length'] = self._check_length(password)
-        results['char_classes'] = self._check_character_classes(password)
-        results['unique_chars'] = self._check_unique_characters(password)
-        results['repeated_sequences'] = self._check_repeated_sequences(password)
-        results['ascii_sequences'] = self._check_ascii_sequences(password)
-        results['palindromes'] = self._check_palindromes(password)
-        results['shannon_entropy'] = self._calculate_shannon_entropy(password)
-        results['positional_entropy'] = self._calculate_positional_entropy(password)
-        results['bigram_uniformity'] = self._check_bigram_uniformity(password)
-        results['keyboard_complexity'] = self._check_keyboard_complexity(password)
-        results['case_switching'] = self._check_case_switching(password)
-        results['symbol_distribution'] = self._check_symbol_distribution(password)
-        results['digit_padding'] = self._check_digit_padding(password)
-        results['lz_complexity'] = self._calculate_lz_complexity(password)
-        results['visual_similarity'] = self._check_visual_similarity(password)
-        results['frequency_distribution'] = self._check_frequency_distribution(password)
-        
-        return results
-    
-    def _check_length(self, password):
-        """Check password length"""
-        length = len(password)
-        if length >= 64:
-            return {'status': 'pass', 'score': 100, 'message': f'Length: {length} chars (Excellent)'}
-        elif length >= 32:
-            return {'status': 'warning', 'score': 80, 'message': f'Length: {length} chars (Good)'}
-        elif length >= 16:
-            return {'status': 'warning', 'score': 60, 'message': f'Length: {length} chars (Fair)'}
-        else:
-            return {'status': 'fail', 'score': 20, 'message': f'Length: {length} chars (Too short)'}
-    
-    def _check_character_classes(self, password):
-        """Check character class inclusion"""
-        classes = {
-            'lowercase': bool(re.search(r'[a-z]', password)),
-            'uppercase': bool(re.search(r'[A-Z]', password)),
-            'digits': bool(re.search(r'[0-9]', password)),
-            'symbols': bool(re.search(r'[^a-zA-Z0-9]', password))
-        }
-        
-        count = sum(classes.values())
-        if count == 4:
-            return {'status': 'pass', 'score': 100, 'message': 'All character classes present'}
-        elif count == 3:
-            return {'status': 'warning', 'score': 75, 'message': f'{count}/4 character classes'}
-        elif count == 2:
-            return {'status': 'warning', 'score': 50, 'message': f'{count}/4 character classes'}
-        else:
-            return {'status': 'fail', 'score': 25, 'message': f'{count}/4 character classes'}
-    
-    def _check_unique_characters(self, password):
-        """Check unique character count"""
-        unique_count = len(set(password))
-        total_count = len(password)
-        ratio = unique_count / total_count if total_count > 0 else 0
-        
-        if ratio >= 0.9:
-            return {'status': 'pass', 'score': 100, 'message': f'{unique_count}/{total_count} unique chars (Excellent)'}
-        elif ratio >= 0.8:
-            return {'status': 'pass', 'score': 85, 'message': f'{unique_count}/{total_count} unique chars (Good)'}
-        elif ratio >= 0.7:
-            return {'status': 'warning', 'score': 70, 'message': f'{unique_count}/{total_count} unique chars (Fair)'}
-        else:
-            return {'status': 'fail', 'score': 50, 'message': f'{unique_count}/{total_count} unique chars (Poor)'}
-    
-    def _check_repeated_sequences(self, password):
-        """Check for repeated sequences"""
-        # Check for exact repeated substrings of length 3+
-        repeated_found = []
-        for length in range(3, len(password) // 2 + 1):
-            for i in range(len(password) - length + 1):
-                substring = password[i:i + length]
-                remaining = password[i + length:]
-                if substring in remaining:
-                    repeated_found.append(substring)
-        
-        if not repeated_found:
-            return {'status': 'pass', 'score': 100, 'message': 'No repeated sequences found'}
-        else:
-            return {'status': 'fail', 'score': 30, 'message': f'Repeated sequences: {len(repeated_found)}'}
-    
-    def _check_ascii_sequences(self, password):
-        """Check for increasing/decreasing ASCII sequences"""
-        sequences = []
-        current_seq = [ord(password[0])] if password else []
-        
-        for i in range(1, len(password)):
-            curr_ord = ord(password[i])
-            if len(current_seq) >= 1:
-                diff = curr_ord - current_seq[-1]
-                if abs(diff) == 1:  # Consecutive ASCII values
-                    current_seq.append(curr_ord)
-                else:
-                    if len(current_seq) >= 3:
-                        sequences.append(current_seq)
-                    current_seq = [curr_ord]
-            else:
-                current_seq = [curr_ord]
-        
-        if len(current_seq) >= 3:
-            sequences.append(current_seq)
-        
-        if not sequences:
-            return {'status': 'pass', 'score': 100, 'message': 'No ASCII sequences found'}
-        else:
-            return {'status': 'warning', 'score': 60, 'message': f'ASCII sequences: {len(sequences)}'}
-    
-    def _check_palindromes(self, password):
-        """Check for palindromic patterns"""
-        palindromes = []
-        for length in range(3, len(password) + 1):
-            for i in range(len(password) - length + 1):
-                substring = password[i:i + length]
-                if substring == substring[::-1]:
-                    palindromes.append(substring)
-        
-        # Remove overlapping shorter palindromes
-        unique_palindromes = []
-        for p in sorted(palindromes, key=len, reverse=True):
-            if not any(p in existing for existing in unique_palindromes):
-                unique_palindromes.append(p)
-        
-        if not unique_palindromes:
-            return {'status': 'pass', 'score': 100, 'message': 'No palindromes found'}
-        else:
-            return {'status': 'warning', 'score': 70, 'message': f'Palindromes: {len(unique_palindromes)}'}
-    
-    def _calculate_shannon_entropy(self, password):
-        """Calculate Shannon entropy"""
-        if not password:
-            return {'status': 'fail', 'score': 0, 'message': 'No password'}
-        
-        counter = Counter(password)
-        length = len(password)
-        entropy = -sum((count / length) * math.log2(count / length) for count in counter.values())
-        
-        # Theoretical maximum entropy for this length
-        max_entropy = math.log2(len(counter)) if len(counter) > 1 else 0
-        normalized_entropy = (entropy / max_entropy) * 100 if max_entropy > 0 else 0
-        
-        if entropy >= 5.5:
-            return {'status': 'pass', 'score': 100, 'message': f'Entropy: {entropy:.2f} bits (Excellent)'}
-        elif entropy >= 4.5:
-            return {'status': 'pass', 'score': 85, 'message': f'Entropy: {entropy:.2f} bits (Good)'}
-        elif entropy >= 3.5:
-            return {'status': 'warning', 'score': 70, 'message': f'Entropy: {entropy:.2f} bits (Fair)'}
-        else:
-            return {'status': 'fail', 'score': 40, 'message': f'Entropy: {entropy:.2f} bits (Poor)'}
-    
-    def _calculate_positional_entropy(self, password):
-        """Calculate positional entropy variation"""
-        if len(password) < 8:
-            return {'status': 'warning', 'score': 50, 'message': 'Too short for analysis'}
-        
-        # Split into 8-character blocks and analyze each position
-        position_chars = defaultdict(list)
-        for i, char in enumerate(password):
-            pos = i % 8
-            position_chars[pos].append(char)
-        
-        position_entropies = []
-        for pos in range(8):
-            if pos in position_chars:
-                chars = position_chars[pos]
-                counter = Counter(chars)
-                length = len(chars)
-                if length > 1:
-                    entropy = -sum((count / length) * math.log2(count / length) for count in counter.values())
-                    position_entropies.append(entropy)
-        
-        if position_entropies:
-            avg_entropy = sum(position_entropies) / len(position_entropies)
-            variance = sum((e - avg_entropy) ** 2 for e in position_entropies) / len(position_entropies)
-            
-            if variance < 0.5 and avg_entropy > 2.0:
-                return {'status': 'pass', 'score': 100, 'message': f'Positional entropy: {avg_entropy:.2f} (Uniform)'}
-            elif avg_entropy > 1.5:
-                return {'status': 'pass', 'score': 80, 'message': f'Positional entropy: {avg_entropy:.2f} (Good)'}
-            else:
-                return {'status': 'warning', 'score': 60, 'message': f'Positional entropy: {avg_entropy:.2f} (Fair)'}
-        else:
-            return {'status': 'fail', 'score': 30, 'message': 'Insufficient variation'}
-    
-    def _check_bigram_uniformity(self, password):
-        """Check bigram frequency uniformity"""
-        if len(password) < 2:
-            return {'status': 'fail', 'score': 0, 'message': 'Too short'}
-        
-        bigrams = [password[i:i+2] for i in range(len(password) - 1)]
-        counter = Counter(bigrams)
-        
-        # Check for uniform distribution
-        expected_freq = len(bigrams) / len(counter)
-        variance = sum((count - expected_freq) ** 2 for count in counter.values()) / len(counter)
-        
-        if variance < expected_freq * 0.5:
-            return {'status': 'pass', 'score': 100, 'message': 'Uniform bigram distribution'}
-        elif variance < expected_freq * 1.0:
-            return {'status': 'pass', 'score': 80, 'message': 'Good bigram distribution'}
-        else:
-            return {'status': 'warning', 'score': 60, 'message': 'Uneven bigram distribution'}
-    
-    def _check_keyboard_complexity(self, password):
-        """Check keyboard traversal complexity"""
-        if len(password) < 2:
-            return {'status': 'fail', 'score': 0, 'message': 'Too short'}
-        
-        total_distance = 0
-        adjacent_pairs = 0
-        
-        for i in range(len(password) - 1):
-            char1, char2 = password[i].lower(), password[i + 1].lower()
-            
-            if char1 in self.keyboard_layout and char2 in self.keyboard_layout[char1]:
-                adjacent_pairs += 1
-            
-            # Simple distance metric based on keyboard position
-            if char1 in self.keyboard_layout and char2 in self.keyboard_layout:
-                total_distance += 1  # Base distance for any transition
-        
-        adjacent_ratio = adjacent_pairs / (len(password) - 1) if len(password) > 1 else 0
-        
-        if adjacent_ratio < 0.2:
-            return {'status': 'pass', 'score': 100, 'message': f'Good keyboard complexity ({adjacent_pairs} adjacent)'}
-        elif adjacent_ratio < 0.4:
-            return {'status': 'pass', 'score': 80, 'message': f'Fair keyboard complexity ({adjacent_pairs} adjacent)'}
-        else:
-            return {'status': 'warning', 'score': 50, 'message': f'Poor keyboard complexity ({adjacent_pairs} adjacent)'}
-    
-    def _check_case_switching(self, password):
-        """Check case switching frequency"""
-        if not any(c.isalpha() for c in password):
-            return {'status': 'warning', 'score': 70, 'message': 'No alphabetic characters'}
-        
-        switches = 0
-        last_case = None
-        
-        for char in password:
-            if char.isalpha():
-                current_case = 'upper' if char.isupper() else 'lower'
-                if last_case and last_case != current_case:
-                    switches += 1
-                last_case = current_case
-        
-        alpha_chars = sum(1 for c in password if c.isalpha())
-        switch_ratio = switches / alpha_chars if alpha_chars > 0 else 0
-        
-        if 0.2 <= switch_ratio <= 0.8:
-            return {'status': 'pass', 'score': 100, 'message': f'Good case variation ({switches} switches)'}
-        elif switch_ratio > 0:
-            return {'status': 'pass', 'score': 80, 'message': f'Some case variation ({switches} switches)'}
-        else:
-            return {'status': 'warning', 'score': 40, 'message': 'No case variation'}
-    
-    def _check_symbol_distribution(self, password):
-        """Check symbol position distribution"""
-        symbols = [i for i, c in enumerate(password) if not c.isalnum()]
-        
-        if not symbols:
-            return {'status': 'warning', 'score': 60, 'message': 'No symbols found'}
-        
-        # Check if symbols are well distributed
-        if len(symbols) >= 3:
-            # Check if symbols are not clustered
-            gaps = [symbols[i+1] - symbols[i] for i in range(len(symbols) - 1)]
-            avg_gap = sum(gaps) / len(gaps) if gaps else 0
-            variance = sum((gap - avg_gap) ** 2 for gap in gaps) / len(gaps) if gaps else 0
-            
-            if variance < avg_gap:
-                return {'status': 'pass', 'score': 100, 'message': f'Well distributed symbols ({len(symbols)})'}
-            else:
-                return {'status': 'pass', 'score': 80, 'message': f'Symbols present ({len(symbols)})'}
-        else:
-            return {'status': 'warning', 'score': 70, 'message': f'Few symbols ({len(symbols)})'}
-    
-    def _check_digit_padding(self, password):
-        """Check for digit padding (digits as prefix/suffix)"""
-        if not password:
-            return {'status': 'fail', 'score': 0, 'message': 'No password'}
-        
-        # Check for leading digits
-        leading_digits = len(password) - len(password.lstrip('0123456789'))
-        # Check for trailing digits
-        trailing_digits = len(password) - len(password.rstrip('0123456789'))
-        
-        padding_ratio = (leading_digits + trailing_digits) / len(password)
-        
-        if padding_ratio < 0.2:
-            return {'status': 'pass', 'score': 100, 'message': 'No digit padding detected'}
-        elif padding_ratio < 0.4:
-            return {'status': 'warning', 'score': 70, 'message': 'Some digit padding detected'}
-        else:
-            return {'status': 'fail', 'score': 40, 'message': 'Heavy digit padding detected'}
-    
-    def _calculate_lz_complexity(self, password):
-        """Calculate Lempel-Ziv complexity"""
-        if not password:
-            return {'status': 'fail', 'score': 0, 'message': 'No password'}
-        
-        # Use zlib compression as approximation of LZ complexity
-        compressed = zlib.compress(password.encode('utf-8'))
-        compression_ratio = len(compressed) / len(password)
-        
-        # Higher compression ratio indicates lower complexity
-        if compression_ratio > 0.8:
-            return {'status': 'pass', 'score': 100, 'message': f'High complexity (ratio: {compression_ratio:.2f})'}
-        elif compression_ratio > 0.6:
-            return {'status': 'pass', 'score': 80, 'message': f'Good complexity (ratio: {compression_ratio:.2f})'}
-        elif compression_ratio > 0.4:
-            return {'status': 'warning', 'score': 60, 'message': f'Fair complexity (ratio: {compression_ratio:.2f})'}
-        else:
-            return {'status': 'fail', 'score': 30, 'message': f'Low complexity (ratio: {compression_ratio:.2f})'}
-    
-    def _check_visual_similarity(self, password):
-        """Check for visually similar character substitutions"""
-        similar_groups_found = 0
-        
-        for group in self.similar_chars:
-            group_chars = [char for char in group if len(char) == 1]  # Single characters only
-            found_in_password = [char for char in group_chars if char in password]
-            if len(found_in_password) > 1:
-                similar_groups_found += 1
-        
-        if similar_groups_found == 0:
-            return {'status': 'pass', 'score': 100, 'message': 'No visual similarity issues'}
-        elif similar_groups_found <= 2:
-            return {'status': 'warning', 'score': 75, 'message': f'Some visual similarity ({similar_groups_found} groups)'}
-        else:
-            return {'status': 'warning', 'score': 50, 'message': f'Multiple visual similarities ({similar_groups_found} groups)'}
-    
-    def _check_frequency_distribution(self, password):
-        """Check character frequency distribution"""
-        if not password:
-            return {'status': 'fail', 'score': 0, 'message': 'No password'}
-        
-        counter = Counter(password)
-        frequencies = list(counter.values())
-        
-        # Calculate statistical measures
-        mean_freq = sum(frequencies) / len(frequencies)
-        variance = sum((f - mean_freq) ** 2 for f in frequencies) / len(frequencies)
-        
-        # Check for uniform distribution
-        if variance < mean_freq * 0.5:
-            return {'status': 'pass', 'score': 100, 'message': 'Uniform frequency distribution'}
-        elif variance < mean_freq * 1.0:
-            return {'status': 'pass', 'score': 80, 'message': 'Good frequency distribution'}
-        else:
-            return {'status': 'warning', 'score': 60, 'message': 'Skewed frequency distribution'}
-
-
 class PasswordGenerator:
-    """Advanced password generator with validation optimization"""
+    """Cryptographically secure password generator"""
     
     def __init__(self):
         self.lowercase = string.ascii_lowercase
@@ -560,7 +244,7 @@ class PasswordGenerator:
         self.symbols = "!@#$%^&*()_+-=[]{}|;:,.<>?"
         
     def generate(self, length=64, use_lower=True, use_upper=True, use_digits=True, use_symbols=True):
-        """Generate optimized password that passes most validation checks"""
+        """Generate cryptographically secure password"""
         charset = ""
         if use_lower:
             charset += self.lowercase
@@ -574,44 +258,126 @@ class PasswordGenerator:
         if not charset:
             return "Error: No character sets selected"
         
-        # Generate password with good distribution
-        password = []
+        # Use secrets for cryptographically secure generation
+        password = ''.join(secrets.choice(charset) for _ in range(length))
         
-        # Ensure all character classes are represented
-        if use_lower:
-            password.extend(random.choices(self.lowercase, k=max(1, length // 8)))
-        if use_upper:
-            password.extend(random.choices(self.uppercase, k=max(1, length // 8)))
-        if use_digits:
-            password.extend(random.choices(self.digits, k=max(1, length // 8)))
-        if use_symbols:
-            password.extend(random.choices(self.symbols, k=max(1, length // 8)))
+        # Ensure all selected character classes are represented
+        classes_needed = []
+        if use_lower and not any(c in self.lowercase for c in password):
+            classes_needed.append(self.lowercase)
+        if use_upper and not any(c in self.uppercase for c in password):
+            classes_needed.append(self.uppercase)
+        if use_digits and not any(c in self.digits for c in password):
+            classes_needed.append(self.digits)
+        if use_symbols and not any(c in self.symbols for c in password):
+            classes_needed.append(self.symbols)
         
-        # Fill remaining length with random selection
-        remaining = length - len(password)
-        if remaining > 0:
-            password.extend(random.choices(charset, k=remaining))
+        # If any classes are missing, replace random characters
+        if classes_needed:
+            password_list = list(password)
+            for char_class in classes_needed:
+                if len(password_list) > 0:
+                    # Replace a random position with a character from the missing class
+                    pos = secrets.randbelow(len(password_list))
+                    password_list[pos] = secrets.choice(char_class)
+            password = ''.join(password_list)
         
-        # Shuffle to avoid predictable patterns
-        random.shuffle(password)
+        return password
+
+
+class PasswordAnalyzer:
+    """Password analyzer using zxcvbn"""
+    
+    def __init__(self):
+        pass
+    
+    def analyze_password(self, password):
+        """Analyze password using zxcvbn"""
+        if not password:
+            return {
+                'score': 0,
+                'guesses': 0,
+                'crack_times_seconds': {},
+                'feedback': {'warning': 'No password provided', 'suggestions': []},
+                'sequence': []
+            }
         
-        # Ensure we don't have obvious patterns
-        password_str = ''.join(password)
+        result = zxcvbn(password)
+        return result
+    
+    def get_crack_time_estimates(self, analysis):
+        """Get crack time estimates for different scenarios"""
+        base_guesses = analysis.get('guesses', 0)
+        if base_guesses == 0:
+            return {}
         
-        # Simple check for obvious issues and regenerate if needed
-        attempts = 0
-        while attempts < 10:
-            # Check for too many repeated characters
-            counter = Counter(password_str)
-            max_freq = max(counter.values())
-            if max_freq > length // 4:  # No character appears more than 25% of the time
-                random.shuffle(password)
-                password_str = ''.join(password)
-                attempts += 1
+        # Convert to float if it's a Decimal object
+        try:
+            base_guesses = float(base_guesses)
+        except (TypeError, ValueError):
+            base_guesses = 0
+        
+        if base_guesses == 0:
+            return {}
+        
+        # More realistic attack scenarios (guesses per second) for modern hardware
+        scenarios = {
+            'Single CPU (Basic)': 1e5,           # 100K guesses/sec
+            'Single CPU (Optimized)': 1e7,       # 10M guesses/sec  
+            'Single GPU (RTX 4090)': 1e11,       # 100B guesses/sec
+            'GPU Cluster (10 GPUs)': 1e12,       # 1T guesses/sec
+            'GPU Cluster (100 GPUs)': 1e13,      # 10T guesses/sec
+            'Massive GPU Array (1K GPUs)': 1e14, # 100T guesses/sec
+            'Massive GPU Array (10K GPUs)': 1e15, # 1P guesses/sec
+            'Massive GPU Array (100K GPUs)': 1e16, # 10P guesses/sec
+        }
+        
+        estimates = {}
+        for scenario, guesses_per_sec in scenarios.items():
+            seconds = base_guesses / (2 * guesses_per_sec)  # Average case
+            estimates[scenario] = self._format_time(seconds)
+        
+        return estimates
+    
+    def _format_time(self, seconds):
+        """Format time in human readable format with millennia as the maximum unit"""
+        if seconds < 1:
+            return "< 1 second"
+        elif seconds < 60:
+            return f"{seconds:.1f} seconds"
+        elif seconds < 3600:
+            minutes = seconds / 60
+            return f"{minutes:.1f} minutes"
+        elif seconds < 86400:
+            hours = seconds / 3600
+            return f"{hours:.1f} hours"
+        elif seconds < 2629746:  # 1 month
+            days = seconds / 86400
+            return f"{days:.1f} days"
+        elif seconds < 31556952:  # 1 year
+            months = seconds / 2629746
+            return f"{months:.1f} months"
+        elif seconds < 3155695200:  # 100 years
+            years = seconds / 31556952
+            return f"{years:.1f} years"
+        elif seconds < 31556952000:  # 1000 years  
+            centuries = seconds / 3155695200
+            return f"{centuries:.1f} centuries"
+        else:
+            # Everything beyond 1000 years uses millennia as the unit
+            millennia = seconds / 31556952000
+            
+            if millennia < 1000:
+                # Simple millennia count for reasonable numbers
+                return f"{millennia:.1f} millennia"
             else:
-                break
-        
-        return password_str[:length]
+                # Scientific notation in millennia for very large numbers
+                try:
+                    exponent = int(math.log10(millennia))
+                    mantissa = millennia / (10 ** exponent)
+                    return f"{mantissa:.1f} × 10^{exponent} millennia"
+                except (ValueError, OverflowError):
+                    return "∞ millennia"
 
 
 class SecretSauceGUI:
@@ -629,11 +395,11 @@ class SecretSauceGUI:
         # Main window
         self.window = Gtk.Window()
         self.window.set_title("SecretSauce - Password Generator & Validator")
-        self.window.set_default_size(600, 700)
+        self.window.set_default_size(600, 650)
         self.window.connect("destroy", Gtk.main_quit)
         
         # Main container
-        main_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+        main_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=15)
         main_box.set_margin_start(20)
         main_box.set_margin_end(20)
         main_box.set_margin_top(20)
@@ -643,7 +409,7 @@ class SecretSauceGUI:
         title_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
         
         title = Gtk.Label()
-        title.set_markup("<b><big>SecretSauce</big></b> - Advanced Password Security")
+        title.set_markup("<b><big>SecretSauce 2.0</big></b> - Advanced Password Security")
         title.set_halign(Gtk.Align.START)
         
         about_button = Gtk.Button(label="About")
@@ -657,16 +423,16 @@ class SecretSauceGUI:
         # Password generation options
         options_frame = Gtk.Frame(label="Password Generation Options")
         options_main_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=20)
-        options_main_box.set_margin_start(10)
-        options_main_box.set_margin_end(10)
-        options_main_box.set_margin_top(10)
-        options_main_box.set_margin_bottom(10)
+        options_main_box.set_margin_start(15)
+        options_main_box.set_margin_end(15)
+        options_main_box.set_margin_top(15)
+        options_main_box.set_margin_bottom(15)
         
         # Character sets section
-        charset_section = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=5)
-        charset_label = Gtk.Label(label="Character Sets:")
-        charset_label.set_xalign(0)
+        charset_section = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        charset_label = Gtk.Label()
         charset_label.set_markup("<b>Character Sets:</b>")
+        charset_label.set_xalign(0)
         charset_section.pack_start(charset_label, False, False, 0)
         
         charset_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=15)
@@ -688,10 +454,10 @@ class SecretSauceGUI:
         charset_section.pack_start(charset_box, False, False, 0)
         
         # Length setting section
-        length_section = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=5)
-        length_label = Gtk.Label(label="Password Length:")
-        length_label.set_xalign(0)
+        length_section = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        length_label = Gtk.Label()
         length_label.set_markup("<b>Password Length:</b>")
+        length_label.set_xalign(0)
         length_section.pack_start(length_label, False, False, 0)
         
         length_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
@@ -710,7 +476,7 @@ class SecretSauceGUI:
         options_frame.add(options_main_box)
         main_box.pack_start(options_frame, False, False, 0)
         
-        # Generate and Copy buttons
+        # Generate and Copy buttons (removed scan button)
         button_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10, homogeneous=True)
         
         self.generate_button = Gtk.Button(label="Generate Password")
@@ -767,21 +533,37 @@ class SecretSauceGUI:
         password_frame.add(password_container)
         main_box.pack_start(password_frame, False, False, 0)
         
-        # Validation results
-        validation_frame = Gtk.Frame(label="Security Analysis")
-        validation_scroll = Gtk.ScrolledWindow()
-        validation_scroll.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
-        validation_scroll.set_min_content_height(300)
+        # Security Analysis
+        analysis_frame = Gtk.Frame(label="Security Analysis (zxcvbn)")
+        analysis_scroll = Gtk.ScrolledWindow()
+        analysis_scroll.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
+        analysis_scroll.set_min_content_height(200)
         
-        self.validation_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=5)
-        self.validation_box.set_margin_start(10)
-        self.validation_box.set_margin_end(10)
-        self.validation_box.set_margin_top(10)
-        self.validation_box.set_margin_bottom(10)
+        self.analysis_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+        self.analysis_box.set_margin_start(15)
+        self.analysis_box.set_margin_end(15)
+        self.analysis_box.set_margin_top(15)
+        self.analysis_box.set_margin_bottom(15)
         
-        validation_scroll.add(self.validation_box)
-        validation_frame.add(validation_scroll)
-        main_box.pack_start(validation_frame, True, True, 0)
+        analysis_scroll.add(self.analysis_box)
+        analysis_frame.add(analysis_scroll)
+        main_box.pack_start(analysis_frame, True, True, 0)
+        
+        # Crack Time Estimates
+        crack_time_frame = Gtk.Frame(label="Crack Time Estimates")
+        crack_time_scroll = Gtk.ScrolledWindow()
+        crack_time_scroll.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
+        crack_time_scroll.set_min_content_height(200)
+        
+        self.crack_time_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=5)
+        self.crack_time_box.set_margin_start(15)
+        self.crack_time_box.set_margin_end(15)
+        self.crack_time_box.set_margin_top(15)
+        self.crack_time_box.set_margin_bottom(15)
+        
+        crack_time_scroll.add(self.crack_time_box)
+        crack_time_frame.add(crack_time_scroll)
+        main_box.pack_start(crack_time_frame, True, True, 0)
         
         self.window.add(main_box)
         self.window.show_all()
@@ -828,58 +610,129 @@ class SecretSauceGUI:
     
     def analyze_password(self):
         """Analyze current password and display results"""
-        # Clear previous results
-        for child in self.validation_box.get_children():
-            self.validation_box.remove(child)
-        
         if not self.current_password:
             return
         
-        results = self.analyzer.analyze_password(self.current_password)
-        
-        for test_name, result in results.items():
-            self.add_validation_result(test_name, result)
-        
-        self.validation_box.show_all()
+        analysis = self.analyzer.analyze_password(self.current_password)
+        self.display_analysis(analysis)
     
-    def add_validation_result(self, test_name, result):
-        """Add a validation result to the display"""
-        row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+    def display_analysis(self, analysis):
+        """Display zxcvbn analysis results"""
+        # Clear previous results
+        for child in self.analysis_box.get_children():
+            self.analysis_box.remove(child)
         
-        # Status icon
-        if result['status'] == 'pass':
-            icon = Gtk.Label(label="✓")
-            icon.set_markup('<span color="green" size="medium"><b>✓</b></span>')
-        elif result['status'] == 'warning':
-            icon = Gtk.Label(label="⚠")
-            icon.set_markup('<span color="orange" size="medium"><b>⚠</b></span>')
+        for child in self.crack_time_box.get_children():
+            self.crack_time_box.remove(child)
+        
+        if not analysis:
+            return
+        
+        # Score display
+        score = analysis.get('score', 0)
+        score_colors = ['red', 'orange', 'orange', 'blue', 'green']
+        score_labels = ['Very Weak', 'Weak', 'Fair', 'Good', 'Strong']
+        
+        score_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        score_label = Gtk.Label()
+        score_label.set_markup(f'<span size="large"><b>Password Strength: </b></span>')
+        score_value = Gtk.Label()
+        score_value.set_markup(f'<span size="large" color="{score_colors[score]}"><b>{score}/4 - {score_labels[score]}</b></span>')
+        
+        score_box.pack_start(score_label, False, False, 0)
+        score_box.pack_start(score_value, False, False, 0)
+        self.analysis_box.pack_start(score_box, False, False, 0)
+        
+        # Guesses - format with scientific notation for large numbers
+        guesses = analysis.get('guesses', 0)
+        if guesses > 0:
+            try:
+                guesses_float = float(guesses)
+                if guesses_float >= 1e6:  # Use scientific notation for numbers >= 1 million
+                    exponent = int(math.log10(guesses_float))
+                    mantissa = guesses_float / (10 ** exponent)
+                    guesses_text = f"{mantissa:.1f} × 10^{exponent}"
+                else:
+                    guesses_text = f"{guesses_float:,.0f}"
+            except (TypeError, ValueError, OverflowError):
+                guesses_text = str(guesses)
         else:
-            icon = Gtk.Label(label="✗")
-            icon.set_markup('<span color="red" size="medium"><b>✗</b></span>')
+            guesses_text = "0"
         
-        # Test name
-        name_label = Gtk.Label(label=test_name.replace('_', ' ').title())
-        name_label.set_markup(f'<small>{test_name.replace("_", " ").title()}</small>')
-        name_label.set_size_request(200, -1)
-        name_label.set_xalign(0)
+        guesses_label = Gtk.Label()
+        guesses_label.set_markup(f'<b>Estimated Guesses:</b> {guesses_text}')
+        guesses_label.set_xalign(0)
+        self.analysis_box.pack_start(guesses_label, False, False, 0)
         
-        # Score
-        score_label = Gtk.Label(label=f"{result['score']}/100")
-        score_label.set_markup(f'<small>{result["score"]}/100</small>')
-        score_label.set_size_request(60, -1)
+        # Feedback
+        feedback = analysis.get('feedback', {})
+        warning = feedback.get('warning', '')
+        suggestions = feedback.get('suggestions', [])
         
-        # Message
-        message_label = Gtk.Label(label=result['message'])
-        message_label.set_markup(f'<small>{result["message"]}</small>')
-        message_label.set_xalign(0)
-        message_label.set_line_wrap(True)
+        if warning:
+            warning_label = Gtk.Label()
+            warning_label.set_markup(f'<span color="red"><b>Warning:</b> {warning}</span>')
+            warning_label.set_xalign(0)
+            warning_label.set_line_wrap(True)
+            self.analysis_box.pack_start(warning_label, False, False, 0)
         
-        row.pack_start(icon, False, False, 0)
-        row.pack_start(name_label, False, False, 0)
-        row.pack_start(score_label, False, False, 0)
-        row.pack_start(message_label, True, True, 0)
+        if suggestions:
+            suggestions_label = Gtk.Label()
+            suggestions_label.set_markup('<b>Suggestions:</b>')
+            suggestions_label.set_xalign(0)
+            self.analysis_box.pack_start(suggestions_label, False, False, 0)
+            
+            for suggestion in suggestions:
+                suggestion_label = Gtk.Label()
+                suggestion_label.set_markup(f'• {suggestion}')
+                suggestion_label.set_xalign(0)
+                suggestion_label.set_line_wrap(True)
+                suggestion_label.set_margin_start(20)
+                self.analysis_box.pack_start(suggestion_label, False, False, 0)
         
-        self.validation_box.pack_start(row, False, False, 0)
+        # Sequence analysis
+        sequence = analysis.get('sequence', [])
+        if sequence:
+            sequence_label = Gtk.Label()
+            sequence_label.set_markup('<b>Pattern Analysis:</b>')
+            sequence_label.set_xalign(0)
+            self.analysis_box.pack_start(sequence_label, False, False, 0)
+            
+            # Add patterns sequentially right after the header
+            for i, pattern in enumerate(sequence[:5]):  # Show first 5 patterns
+                pattern_text = f"• {pattern.get('pattern', 'unknown')}: '{pattern.get('token', '')}'"
+                if 'dictionary_name' in pattern:
+                    pattern_text += f" (from {pattern['dictionary_name']})"
+                
+                pattern_label = Gtk.Label()
+                pattern_label.set_markup(pattern_text)
+                pattern_label.set_xalign(0)
+                pattern_label.set_line_wrap(True)
+                pattern_label.set_margin_start(20)
+                self.analysis_box.pack_start(pattern_label, False, False, 0)
+        
+        # Crack time estimates
+        crack_times = self.analyzer.get_crack_time_estimates(analysis)
+        
+        for scenario, time_estimate in crack_times.items():
+            time_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+            
+            scenario_label = Gtk.Label()
+            scenario_label.set_markup(f'<b>{scenario}:</b>')
+            scenario_label.set_size_request(250, -1)
+            scenario_label.set_xalign(0)
+            
+            time_label = Gtk.Label()
+            time_label.set_markup(time_estimate)
+            time_label.set_xalign(0)
+            
+            time_box.pack_start(scenario_label, False, False, 0)
+            time_box.pack_start(time_label, True, True, 0)
+            
+            self.crack_time_box.pack_start(time_box, False, False, 0)
+        
+        self.analysis_box.show_all()
+        self.crack_time_box.show_all()
     
     def on_copy_clicked(self, button):
         """Copy password to clipboard"""
@@ -897,6 +750,6 @@ class SecretSauceGUI:
 
 
 if __name__ == "__main__":
-    print("Starting SecretSauce...")
+    print("Starting SecretSauce 2.0...")
     app = SecretSauceGUI()
     app.run()
