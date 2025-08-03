@@ -32,7 +32,9 @@ SecretSauce is a professional-grade password generator and security analyzer bui
 
 ## 🖼️ Screenshots
 
-*Screenshots showing the application interface with password generation, security analysis, and crack time estimates.*
+![SecretSauce Main Window](screenshots/main-window.png)
+
+*SecretSauce 2.0 interface showing password generation, security analysis, and comprehensive crack time estimates.*
 
 ## 🚀 Installation
 
@@ -40,17 +42,17 @@ SecretSauce is a professional-grade password generator and security analyzer bui
 
 **Ubuntu/Debian:**
 ```bash
-sudo apt install python3-gi python3-gi-cairo gir1.2-gtk-3.0
+sudo apt install python3-gi python3-gi-cairo gir1.2-gtk-3.0 python3-zxcvbn
 ```
 
 **Fedora:**
 ```bash
-sudo dnf install python3-gobject gtk3-devel
+sudo dnf install python3-gobject gtk3-devel python3-zxcvbn
 ```
 
 **Arch Linux:**
 ```bash
-sudo pacman -S python-gobject gtk3
+sudo pacman -S python-gobject gtk3 python-zxcvbn
 ```
 
 ### Install SecretSauce
@@ -66,7 +68,43 @@ cd SecretSauce
 python3 password.py
 ```
 
-The application will automatically install the `zxcvbn` dependency if it's not already installed.
+### 🛠️ If Installation Fails
+
+Modern Python environments (3.11+) may prevent automatic package installation. If you see an "externally-managed-environment" error, use one of these methods:
+
+#### Method 1: System Package Manager (Recommended)
+```bash
+# Ubuntu/Debian
+sudo apt install python3-zxcvbn
+
+# Fedora  
+sudo dnf install python3-zxcvbn
+
+# Arch Linux
+sudo pacman -S python-zxcvbn
+```
+
+#### Method 2: Virtual Environment
+```bash
+python3 -m venv secretsauce-env
+source secretsauce-env/bin/activate
+pip install zxcvbn
+python password.py
+```
+
+#### Method 3: pipx (Application Installer)
+```bash
+# Install pipx if not available
+sudo apt install pipx  # Ubuntu/Debian
+pipx install zxcvbn
+```
+
+#### Method 4: User Install
+```bash
+python3 -m pip install --user zxcvbn
+```
+
+> **💡 Note:** The application will try these methods automatically if `zxcvbn` is missing. If automatic installation fails, it will display detailed instructions for manual installation.
 
 ## 📖 Usage
 
@@ -122,6 +160,24 @@ For very large times, scientific notation is used: `2.7 × 10^36 millennia`
 - **Cross-platform compatibility** (Linux, macOS, Windows with GTK3)
 
 ## 🛠️ Development
+
+### Troubleshooting
+
+**"externally-managed-environment" Error:**
+- This occurs on Python 3.11+ systems that prevent global pip installs
+- Solution: Use system package manager or virtual environment (see installation methods above)
+
+**GTK3 Import Error:**
+- Install GTK3 development libraries using your system package manager
+- Ensure `python3-gi` is installed
+
+**"zxcvbn not found" Error:**
+- The app will show detailed installation instructions automatically
+- Try system package manager first, then virtual environment
+
+**Application Won't Start:**
+- Verify Python 3.6+ is installed: `python3 --version`
+- Check GTK3 availability: `python3 -c "import gi; gi.require_version('Gtk', '3.0')"`
 
 ### Project Structure
 ```
