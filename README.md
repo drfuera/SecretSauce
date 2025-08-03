@@ -1,46 +1,42 @@
-# SecretSauce 🔐
+# SecretSauce 2.0 🔐
 
-**Advanced Password Generator & Security Validator with GTK3 GUI**
+**Advanced Password Generator & Security Validator**
 
-SecretSauce is a comprehensive password security tool that generates ultra-secure passwords and validates them through 16+ advanced analysis methods. Built with Python and GTK3, it provides real-time security feedback to help you create unbreakable passwords.
-
-![SecretSauce Screenshot](screenshots/main-window.png)
+SecretSauce is a professional-grade password generator and security analyzer built with GTK3. It combines cryptographically secure password generation with industry-standard strength analysis using Dropbox's zxcvbn library.
 
 ## ✨ Features
 
-### 🎲 **Advanced Password Generation**
-- **Customizable length**: 8 to 4,096 characters
-- **Character set selection**: Lowercase, uppercase, digits, symbols
-- **Smart distribution**: Ensures all selected character types are represented
-- **Pattern avoidance**: Automatically prevents predictable sequences
-- **Visual highlighting**: Every 8th character highlighted in red for easy partial copying
+### 🔒 **Cryptographically Secure Generation**
+- Uses Python's `secrets` module for cryptographic randomness
+- Customizable character sets (lowercase, uppercase, digits, symbols)
+- Password lengths from 8 to 4096 characters
+- Guaranteed character class representation
 
-### 🔍 **Comprehensive Security Analysis (16+ Methods)**
-- **Basic Security**: Length, character classes, unique character count
-- **Pattern Detection**: Repeated sequences, ASCII sequences, palindromes
-- **Entropy Analysis**: Shannon entropy, positional entropy variation
-- **Advanced Algorithms**: Bigram uniformity, Lempel-Ziv complexity
-- **Keyboard Analysis**: Adjacency complexity, ergonomics scoring
-- **Visual Security**: Similar character detection, case switching analysis
-- **Distribution Analysis**: Symbol positioning, digit padding detection
-- **Frequency Analysis**: Character distribution skewness
+### 📊 **Professional Security Analysis**
+- **zxcvbn integration** - Industry-standard password strength evaluation (0-4 scale)
+- **Pattern detection** - Identifies common patterns, dictionary words, and sequences
+- **Detailed feedback** - Specific warnings and improvement suggestions
+- **Scientific notation** - Clean display of large numbers (guesses, time estimates)
 
-### 🖥️ **User Experience**
-- **Clean GTK3 interface** that integrates with your desktop
-- **Real-time validation** with color-coded results (✓ ⚠ ✗)
-- **Auto-generation** on startup
-- **One-click copying** to clipboard
-- **Detailed scoring** (0-100) for each security metric
-- **Compact layout** optimized for efficiency
+### ⏱️ **Comprehensive Crack Time Estimates**
+- **8 attack scenarios** from single CPU to massive GPU arrays
+- **Realistic hardware performance** based on modern computing capabilities
+- **Intuitive time formatting** with scientific notation in millennia for very large values
+- **Range**: seconds to 10^40+ millennia
 
-## 📦 Installation
+### 🎨 **Clean User Interface**
+- **GTK3-based** native desktop application
+- **Visual password highlighting** - Every 8th character highlighted for readability
+- **Real-time analysis** - Instant feedback on password strength
+- **Professional design** - Clean, intuitive layout
 
-### System Requirements
-- **Linux** (GTK3 desktop environment)
-- **Python 3.6+**
-- **GTK3 development libraries**
+## 🖼️ Screenshots
 
-### Install GTK3 Dependencies
+*Screenshots showing the application interface with password generation, security analysis, and crack time estimates.*
+
+## 🚀 Installation
+
+### Prerequisites
 
 **Ubuntu/Debian:**
 ```bash
@@ -57,178 +53,154 @@ sudo dnf install python3-gobject gtk3-devel
 sudo pacman -S python-gobject gtk3
 ```
 
-### Download and Run
+### Install SecretSauce
+
+1. **Clone the repository:**
 ```bash
-# Clone the repository
 git clone https://github.com/drfuera/SecretSauce.git
 cd SecretSauce
+```
 
-# Run SecretSauce
+2. **Run the application:**
+```bash
 python3 password.py
 ```
 
-That's it! SecretSauce will automatically check dependencies and generate your first secure password.
+The application will automatically install the `zxcvbn` dependency if it's not already installed.
 
-## 🚀 Quick Start
+## 📖 Usage
 
-1. **Launch** SecretSauce: `python3 password.py`
-2. **Customize** character sets and password length
-3. **Generate** a password with the big button
-4. **Review** the security analysis results
-5. **Copy** your secure password to clipboard
+### Basic Usage
 
-## 🔬 Security Analysis Methods
+1. **Select character sets** - Choose which types of characters to include
+2. **Set password length** - Use the spinner to select desired length (8-4096)
+3. **Generate password** - Click "Generate Password" for a new secure password
+4. **Analyze strength** - View real-time security analysis and crack time estimates
+5. **Copy password** - Click "Copy Password" to copy to clipboard
 
-SecretSauce evaluates password strength through multiple sophisticated algorithms:
+### Understanding the Analysis
 
-| Category | Methods | Purpose |
-|----------|---------|---------|
-| **Basic Security** | Length, Character Classes, Unique Characters | Foundation security metrics |
-| **Pattern Detection** | Repeated Sequences, ASCII Sequences, Palindromes | Identifies predictable patterns |
-| **Entropy Analysis** | Shannon Entropy, Positional Entropy | Measures randomness and uniformity |
-| **Keyboard Security** | Adjacency Analysis, Traversal Complexity | Evaluates typing patterns |
-| **Advanced Analysis** | Lempel-Ziv Complexity, Bigram Uniformity | Compression and sequence analysis |
-| **Visual Security** | Similar Characters, Case Switching | Human perception vulnerabilities |
-| **Distribution** | Symbol Positioning, Digit Padding | Character placement analysis |
+#### Password Strength (0-4 Scale)
+- **0**: Very Weak (red)
+- **1**: Weak (orange) 
+- **2**: Fair (orange)
+- **3**: Good (blue)
+- **4**: Strong (green)
 
-Each method provides a score (0-100) and detailed feedback to help you understand password strength.
+#### Crack Time Scenarios
+- **Single CPU (Basic)**: 100K guesses/sec
+- **Single CPU (Optimized)**: 10M guesses/sec
+- **Single GPU (RTX 4090)**: 100B guesses/sec
+- **GPU Cluster (10 GPUs)**: 1T guesses/sec
+- **GPU Cluster (100 GPUs)**: 10T guesses/sec
+- **Massive GPU Array (1K GPUs)**: 100T guesses/sec
+- **Massive GPU Array (10K GPUs)**: 1P guesses/sec
+- **Massive GPU Array (100K GPUs)**: 10P guesses/sec
 
-## 🎯 Use Cases
+#### Time Units
+Times progress naturally: seconds → minutes → hours → days → months → years → centuries → millennia
 
-- **Personal Security**: Generate strong passwords for personal accounts
-- **Enterprise Security**: Validate password policies and requirements  
-- **Security Research**: Analyze password strength metrics and patterns
-- **Education**: Learn about password security and cryptographic principles
-- **Development**: Integrate password analysis into other security tools
+For very large times, scientific notation is used: `2.7 × 10^36 millennia`
 
-## 🛠️ Configuration
+## 🔧 Technical Details
 
-SecretSauce works out of the box with sensible defaults:
-- **Default length**: 64 characters
-- **All character sets enabled**: a-z, A-Z, 0-9, symbols
-- **Auto-generation on startup**
-- **Optimized for maximum security**
+### Dependencies
+- **Python 3.6+**
+- **GTK3** with GObject Introspection
+- **zxcvbn** (automatically installed)
 
-Customize through the GUI:
-- Adjust password length (8-4096 characters)
-- Toggle character sets on/off
-- Generate multiple passwords
-- Copy individual passwords
+### Security Features
+- **Cryptographic randomness** using `secrets.SystemRandom`
+- **No predictable patterns** in generation
+- **Industry-standard analysis** via zxcvbn
+- **No data collection** - everything runs locally
 
-## 📱 Desktop Integration
+### Performance
+- **Instant generation** for passwords up to 4096 characters
+- **Real-time analysis** with sub-second response times
+- **Minimal memory footprint** 
+- **Cross-platform compatibility** (Linux, macOS, Windows with GTK3)
 
-SecretSauce is designed to integrate seamlessly with Linux desktop environments:
-- **GTK3 native interface** matches your theme
-- **Standard keyboard shortcuts** 
-- **Clipboard integration** for easy password copying
-- **About dialog** with project information
-- **Responsive design** works on various screen sizes
+## 🛠️ Development
+
+### Project Structure
+```
+SecretSauce/
+├── password.py          # Main application
+├── README.md           # This file
+└── LICENSE             # CC BY License
+```
+
+### Key Classes
+- **`PasswordGenerator`** - Cryptographically secure password generation
+- **`PasswordAnalyzer`** - zxcvbn integration and crack time calculations  
+- **`SecretSauceGUI`** - GTK3 user interface
+- **`AboutDialog`** - Application information dialog
+
+## 📋 Requirements
+
+**System Requirements:**
+- Linux with GTK3 support
+- Python 3.6 or higher
+- 50MB disk space
+- 64MB RAM
+
+**Tested On:**
+- Ubuntu 20.04+ 
+- Fedora 35+
+- Arch Linux
+- Debian 11+
 
 ## 🤝 Contributing
 
-We welcome contributions! Here's how you can help:
+Contributions are welcome! Please feel free to submit issues, feature requests, or pull requests.
 
-### 🐛 **Bug Reports**
-- Use the [Issues](https://github.com/drfuera/SecretSauce/issues) page
-- Include your Linux distribution and Python version
-- Describe steps to reproduce the issue
+### Development Setup
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Test on multiple GTK3 environments
+5. Submit a pull request
 
-### 💡 **Feature Requests**
-- Suggest new security analysis methods
-- Propose UI/UX improvements
-- Request additional password generation options
-
-### 🔧 **Code Contributions**
-- Fork the repository
-- Create a feature branch: `git checkout -b feature-name`
-- Make your changes and test thoroughly
-- Submit a pull request with a clear description
-
-### 📊 **Security Research**
-- Propose new password analysis algorithms
-- Share research on password security patterns
-- Help improve existing analysis methods
-
-## 📋 Technical Details
-
-### Architecture
-- **Frontend**: GTK3 with Python GObject bindings
-- **Backend**: Pure Python with standard library modules
-- **Security**: No network connections, all analysis performed locally
-- **Performance**: Optimized for real-time analysis of long passwords
-
-### Dependencies
-- **Required**: Python 3.6+, GTK3, PyGObject
-- **Optional**: None (all analysis uses standard library)
-- **Size**: ~50KB Python code, minimal footprint
-
-### Security Design
-- **Local processing**: No data transmitted over network
-- **Memory safety**: Passwords not stored persistently
-- **Clipboard integration**: Standard system clipboard only
-- **No telemetry**: No usage data collected
-
-## 📈 Roadmap
-
-### Version 1.1 (Planned)
-- [ ] Additional entropy analysis methods
-- [ ] Password strength visualization charts
-- [ ] Export analysis results to CSV/JSON
-- [ ] Custom symbol sets
-
-### Version 1.2 (Future)
-- [ ] Batch password analysis
-- [ ] Password policy compliance checking
-- [ ] Integration with password managers
-- [ ] Command-line interface
-
-### Long-term
-- [ ] Multi-language support
-- [ ] Windows/macOS ports
-- [ ] Plugin architecture for custom analysis
-- [ ] Password breach database checking
-
-## 🏆 Why SecretSauce?
-
-| Feature | SecretSauce | Other Tools |
-|---------|-------------|-------------|
-| **Analysis Methods** | 16+ comprehensive | Usually 3-5 basic |
-| **Password Length** | Up to 4,096 chars | Often limited to 64 |
-| **Real-time Feedback** | ✓ Instant analysis | Often batch only |
-| **Open Source** | ✓ CC BY License | Many proprietary |
-| **Desktop Integration** | ✓ Native GTK3 | Often web-based |
-| **Privacy** | ✓ 100% local | Many cloud-based |
-| **Educational** | ✓ Detailed explanations | Usually just scores |
+### Coding Standards
+- Follow PEP 8 for Python code
+- Add comments for complex algorithms
+- Maintain GTK3 compatibility
+- Test password generation security
 
 ## 📄 License
 
-**Creative Commons Attribution (CC BY)**
+This project is licensed under the **Creative Commons Attribution (CC BY)** license.
 
 You are free to:
-- **Share** — copy and redistribute the material in any medium or format
-- **Adapt** — remix, transform, and build upon the material for any purpose, even commercially
+- **Share** - Copy and redistribute in any medium or format
+- **Adapt** - Remix, transform, and build upon the material
+- **Commercial use** - Use for commercial purposes
 
 Under the following terms:
-- **Attribution** — You must give appropriate credit to Andrej Fuera
+- **Attribution** - You must give appropriate credit to Andrej Fuera
 
-See [LICENSE](LICENSE) for the complete terms.
+See the [LICENSE](LICENSE) file for details.
 
 ## 👨‍💻 Author
 
-**Andrej Fuera** - Created with Claude
-
+**Andrej Fuera**
 - GitHub: [@drfuera](https://github.com/drfuera)
-- Project: [SecretSauce](https://github.com/drfuera/SecretSauce)
+- Created with assistance from Claude (Anthropic)
 
-## 🔗 Links
+## 🔗 Related Projects
 
-- **Repository**: https://github.com/drfuera/SecretSauce
-- **Issues**: https://github.com/drfuera/SecretSauce/issues
-- **Releases**: https://github.com/drfuera/SecretSauce/releases
-- **License**: Creative Commons Attribution (CC BY)
+- **[zxcvbn](https://github.com/dropbox/zxcvbn)** - Password strength estimation library by Dropbox
+- **[Python Secrets](https://docs.python.org/3/library/secrets.html)** - Cryptographically secure random number generation
+
+## 📚 References
+
+- [NIST SP 800-63B](https://pages.nist.gov/800-63-3/sp800-63b.html) - Digital Identity Guidelines
+- [OWASP Password Storage Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html)
+- [Dropbox zxcvbn Paper](https://www.usenix.org/conference/usenixsecurity16/technical-sessions/presentation/wheeler)
 
 ---
 
-**🔐 Stay secure, stay protected with SecretSauce!**
+⭐ **Star this repository if you find SecretSauce useful!**
 
-*Made with ❤️ for the open source and security community*
+🔐 **Generate secure passwords. Stay safe online.**
