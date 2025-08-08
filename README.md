@@ -1,3 +1,5 @@
+![GitHub release](https://img.shields.io/github/v/release/drfuera/SecretSauce)    ![GitHub downloads](https://img.shields.io/github/downloads/drfuera/SecretSauce/total)    ![License](https://img.shields.io/badge/License-MIT-red)  
+
 # SecretSauce - Advanced Password Generator & Validator
 
 ![SecretScreenshot](https://github.com/drfuera/SecretSauce/raw/main/screenshots/main-window.png)
